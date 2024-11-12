@@ -24,18 +24,18 @@ function plot_regret_transition(utility::Matrix{Float64}, methodW::Vector{NamedT
     p = plot(
         t_values,
         regrets',
-        xlabel="t値",
-        ylabel="リグレット",
-        title="t値に対するリグレットの推移",
+        xlabel="t",
+        ylabel="Regret",
+        title="Regret Transition",
         lw=2,
-        legend=:topright,
-        grid=true,
-        fontfamily="MS Gothic"
+        legend=:outerright,  # 凡例を右側の外に配置
+        size=(800,400),      # プロットのサイズを調整して凡例用のスペースを確保
+        grid=true
     )
     
     # t_rangeの範囲を点線で表示
     vline!([t_range[1], t_range[2]], 
-           label="t範囲", 
+           label="t range", 
            linestyle=:dash, 
            color=:black, 
            alpha=0.5)
