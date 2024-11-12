@@ -44,18 +44,6 @@ function read_method_weights(filename::String,repeat_num::Int,criteria_num::Int)
         ) for i in 1:repeat_num]
 
         return result
-        # # B列の4行目を起点に、指定された列数と行数のデータを抽出
-        # values = data[1:repeat_num, 2:1+criteria_num*2]
-        # #　adjacent は各区間の幅の総和を表す
-        # adjacent_values = data[1:repeat_num, 2+criteria_num*2]
-        # # 交互にLとRに格納（行列形式repeat行criteria列）
-        # L = reshape([values[row, col] for col in 1:2:criteria_num*2-1 for row in 1:repeat_num], repeat_num, criteria_num)
-        # R = reshape([values[row, col] for col in 2:2:criteria_num*2 for row in 1:repeat_num], repeat_num, criteria_num)
-        # #返り値はタプル
-        # return (
-        #     L = L,
-        #     R = R,
-        #     adjacent = Vector(adjacent_values)
-        # );
+
     end
 end
