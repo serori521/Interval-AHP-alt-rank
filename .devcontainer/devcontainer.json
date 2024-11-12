@@ -1,0 +1,24 @@
+{
+    "name": "inulab-julia",
+    "build": {
+        "dockerfile": "./Dockerfile"
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-toolsai.jupyter",
+                "julialang.language-julia"
+            ],
+            "settings": {
+                "terminal.integrated.shell": "/bin/bash",
+                "jupyter.experiments.optOutFrom": [
+                    "NativeNotebookEditor"
+                ],
+                "[julia]": {
+                    "editor.defaultFormatter": "julialang.language-julia",
+                    "editor.formatOnSave": true
+                }
+            }
+        }
+    }
+}
