@@ -1,4 +1,3 @@
-include("save_rank_changes.jl")
 include("calc_IPW.jl")
 
 # 順位変化の結果をCSVに保存する関数
