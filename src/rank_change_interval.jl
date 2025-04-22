@@ -1,5 +1,5 @@
 module RankChangeInterval
-
+# 順序変化点を求めるモジュール
 using Statistics, LinearAlgebra
 export find_rank_change_points, analyze_all_alternatives
 include("calc_IPW.jl")

@@ -1,4 +1,4 @@
-
+#一番重要なリグレットを計算するファイル
 #複数存在する最適解のtの範囲を求める関数
 function find_optimal_trange(L::Array{Float64,1},R::Array{Float64,1})
     max_sum = -Inf
