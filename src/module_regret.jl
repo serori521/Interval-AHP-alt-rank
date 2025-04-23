@@ -161,7 +161,7 @@ function find_rank_change_points_from_tR(o_o::Int, t_L::Float64, t_R::Float64, m
         # 区間内の順位変化点を検出
         interval_result = find_rank_change_in_interval(o_o, current_t, next_t, matrix, methodW)
         push!(interval_data, interval_result)
-        
+        println(interval_result)
         # 全体の結果に追加
         append!(all_change_points, interval_result.change_points)
         append!(all_max_regret_alts, interval_result.max_regret_alts)
