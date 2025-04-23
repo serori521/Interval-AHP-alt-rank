@@ -18,3 +18,4 @@ COPY ./init.jl /tmp/init.jl
 USER jovyan
 
 RUN julia /tmp/init.jl
+
