@@ -1,6 +1,6 @@
 module RankChangeInterval
-using Statistics, LinearAlgebra
-export find_rank_change_points_from_tR, analyze_all_alternatives_with_avail_space
+using Statistics, LinearAlgebra, DataFrames, CSV
+export find_rank_change_points_from_tR, analyze_all_alternatives_with_avail_space, save_rank_changes_and_rankings_to_csv
 include("calc_IPW.jl")
 
 # 指定した t における代替案 o_o と o_q 間のリグレット値を返す関数
@@ -15,14 +15,9 @@ function regret_value(o_o::Int, o_q::Int, t::Float64, matrix, methodW)
     # 一時的に regret を計算
     temp_matrix = deepcopy(matrix)
     _, _ = calc_regret(temp_matrix, Y_L, Y_R)
-
+    println(o_o, o_q, temp_matrix[o_o, o_q].regret)
     # 行列内のリグレット値を取得
-    i, j = minmax(o_o, o_q)
-    if i == o_o
-        return temp_matrix[i, j].regret
-    else
-        return -temp_matrix[i, j].regret  # 符号を反転
-    end
+    return temp_matrix[o_o, o_q].regret
 end
 
 # アベイルスペースから次のt'を計算する関数
@@ -232,95 +227,304 @@ function analyze_all_alternatives_with_avail_space(utility::Matrix{Float64}, met
     n = size(utility, 1)
     matrix = create_minimax_R_Matrix(utility)
 
-    # 各代替案の順位変化点を格納
-    all_results = Dict{Int,Any}()
-
+    # 各代替案ごとの詳細な分析結果を格納
+    all_results_per_alternative = Dict{Int,Any}()
     for o_o in 1:n
         result = find_rank_change_points_from_tR(o_o, t_range[1], t_range[2], matrix, methodW)
-        all_results[o_o] = result
+        all_results_per_alternative[o_o] = result
     end
 
-    # 全ての変化点をソート
-    all_change_points = Float64[]
+    # 全ての「個々の代替案に対するリグレット相手が変わる点」を収集
+    collected_individual_change_points = Float64[]
     for o_o in 1:n
-        append!(all_change_points, all_results[o_o].change_points)
+        # result が名前付きタプルで .change_points フィールドを持つことを期待
+        if hasfield(typeof(all_results_per_alternative[o_o]), :change_points)
+            append!(collected_individual_change_points, all_results_per_alternative[o_o].change_points)
+        end
     end
-    unique!(sort!(all_change_points))
 
-    # アベイルスペースに基づく区間も収集
-    all_intervals = Tuple{Float64,Float64}[]
+    # アベイルスペースに基づく区間境界も収集
+    all_unique_intervals = Tuple{Float64,Float64}[]
     for o_o in 1:n
-        append!(all_intervals, all_results[o_o].intervals)
+        if hasfield(typeof(all_results_per_alternative[o_o]), :intervals)
+            append!(all_unique_intervals, all_results_per_alternative[o_o].intervals)
+        end
     end
-    unique!(all_intervals)
+    unique!(all_unique_intervals) # 重複する区間を削除
 
-    # すべての重要な点（変化点と区間境界）をまとめる
-    all_points = Float64[]
-    append!(all_points, all_change_points)
-    for (lower, upper) in all_intervals
-        push!(all_points, lower)
-        push!(all_points, upper)
+    # ランキングを評価すべき全ての重要なt点をまとめる
+    # (個々の変化点、区間境界、分析範囲の端点)
+    critical_t_points = Float64[]
+    append!(critical_t_points, collected_individual_change_points)
+    for (lower, upper) in all_unique_intervals
+        push!(critical_t_points, lower)
+        push!(critical_t_points, upper)
     end
-    unique!(sort!(all_points))
+    push!(critical_t_points, t_range[1]) # 分析範囲の開始点
+    push!(critical_t_points, t_range[2]) # 分析範囲の終了点
+    unique!(sort!(critical_t_points))
+    # 範囲外の点や非常に近い点を除くフィルタリング (必要に応じて)
+    filter!(p -> p >= t_range[1] - 1e-9 && p <= t_range[2] + 1e-9, critical_t_points)
+    # 非常に近い点をまとめる処理も検討可能 (例: 差が1e-7未満なら同一視)
 
-    # 各ポイントでの順位を計算
-    rankings = Dict{Float64,Vector{Int}}()
-
-    for t in all_points
-        # 各代替案の最大リグレットを計算
-        max_regrets = zeros(n)
-        for o_o in 1:n
-            # t での最大リグレットを計算
-            max_r = -Inf
-            for q in 1:n
-                if q != o_o
-                    r = regret_value(o_o, q, t, matrix, methodW)
-                    max_r = max(max_r, r)
+    # 各重要t点での全体のランキングを計算
+    overall_rankings = Dict{Float64,Vector{Int}}()
+    for t_val in critical_t_points
+        max_regrets_for_all_oo = zeros(n)
+        for o_o_idx in 1:n
+            current_max_r = -Inf
+            # o_o_idx 以外の全ての代替案 q_idx とのリグレットを計算し、その最大値を取る
+            for q_idx in 1:n
+                if q_idx != o_o_idx
+                    r_val = regret_value(o_o_idx, q_idx, t_val, matrix, methodW)
+                    current_max_r = max(current_max_r, r_val)
                 end
             end
-            max_regrets[o_o] = max_r
+            # もし全ての相手とのリグレットが-Infなら (通常は起こらないが)、0.0 とする
+            max_regrets_for_all_oo[o_o_idx] = current_max_r == -Inf ? 0.0 : current_max_r
         end
-
-        # リグレットの小さい順に並べる（順位付け）
-        rankings[t] = sortperm(max_regrets)
+        overall_rankings[t_val] = sortperm(max_regrets_for_all_oo) # リグレットが小さい順が上位
     end
 
-    # 代替案間の比較による追加の順位変化点を検出
-    additional_change_points = Float64[]
+    # --- 全体的な順位変化点の検出と、その時点でのランキングを記録 ---
+    overall_rank_change_events = [] # (t_value=変化点t, ranking=そのtでのランキング) の名前付きタプルの配列
 
-    # 各代替案ペアの区間でリグレット範囲が重なる部分を検出
-    for i in 1:n
-        for j in i+1:n
-            # 各代替案の区間データを取得
-            i_intervals = all_results[i].interval_data
-            j_intervals = all_results[j].interval_data
+    # critical_t_points はソート済みなので、順番に比較していく
+    if length(critical_t_points) >= 1
+        # 最初のt点 (通常はt_L) でのランキングを初期状態として記録
+        # これを「最初の変化点」として扱うかは要件による
+        # ここでは、t_Lでの状態をまず記録し、その後変化があれば記録する方針
+        first_t = critical_t_points[1]
+        push!(overall_rank_change_events, (t_value=first_t, ranking=overall_rankings[first_t]))
 
-            # 各区間の組み合わせでリグレット範囲の重なりを確認
-            for i_data in i_intervals
-                for j_data in j_intervals
-                    # リグレット範囲が重なる場合
-                    if !(i_data.r_max_in_interval < j_data.r_min_in_interval || i_data.r_min_in_interval > j_data.r_max_in_interval)
+        if length(critical_t_points) >= 2
+            for i in 1:(length(critical_t_points)-1)
+                t1 = critical_t_points[i]
+                t2 = critical_t_points[i+1]
 
-                        # 線形関数のパラメータを計算し、交点を求める
-                        # (簡略化のため、詳細な実装は省略)
-                        # この部分は代替案間の比較による順位変化点の検出となります
+                ranking_at_t1 = overall_rankings[t1]
+                ranking_at_t2 = overall_rankings[t2]
+
+                if ranking_at_t1 != ranking_at_t2
+                    # t1 から t2 の間で順位が変動した
+                    # 変化点としては t2 (変化が確定した最初のt点) を記録し、その時のランキングを保存
+                    # 既に t2 が overall_rank_change_events の最後の t_value と同じでなければ追加
+                    if isempty(overall_rank_change_events) || last(overall_rank_change_events).t_value != t2
+                        push!(overall_rank_change_events, (t_value=t2, ranking=ranking_at_t2))
                     end
                 end
             end
         end
     end
 
-    # 追加の変化点を統合
-    append!(all_change_points, additional_change_points)
-    unique!(sort!(all_change_points))
+    # `change_points` は `overall_rank_change_events` の `t_value` のリスト
+    final_overall_change_points = [event.t_value for event in overall_rank_change_events]
+    # もし最初のt_Lを変化点として含めないなら、ここで調整
+    # 例: if length(final_overall_change_points) > 1 && final_overall_change_points[1] == t_range[1]
+    #         popfirst!(final_overall_change_points)
+    #         popfirst!(overall_rank_change_events)
+    #     end
 
     return (
-        all_results=all_results,
-        change_points=all_change_points,
-        intervals=all_intervals,
-        all_points=all_points,
-        rankings=rankings
+        all_results_per_alternative=all_results_per_alternative,
+        change_points=final_overall_change_points,     # 全体でランキングが実際に変わったt点のリスト
+        rank_change_data=overall_rank_change_events, # (t値, そのt値でのランキング) の名前付きタプルのリスト
+        intervals=all_unique_intervals,                # アベイルスペース区間
+        all_points=critical_t_points,                  # ランキングを計算した全てのt点
+        rankings=overall_rankings                      # 各t点での全体のランキング
     )
+end
+
+function save_rank_changes_and_rankings_to_csv(results, filename="rank_change_details.csv")
+    println("CSV保存関数 (save_final_rank_changes_to_csv) を開始します。")
+
+    # results が必要なフィールドを持っているか確認
+    if !hasfield(typeof(results), :change_points) || !hasfield(typeof(results), :rankings)
+        println("警告: 'results'に必要な 'change_points' または 'rankings' フィールドが存在しません。")
+        return DataFrame() # 空のDataFrameを返す
+    end
+
+    relevant_t_points = sort(unique(results.change_points)) # 順位変化点のみを対象とする
+
+    # もし change_points が空でも、t_range の開始点と終了点でのランキングは表示したい場合、
+    # relevant_t_points に t_range[1] と t_range[2] を追加することも検討できます。
+    # 例: relevant_t_points = sort(unique([results.change_points..., results.all_points[1], results.all_points[end]]))
+    # 今回は、明確な「変化点」のみをCSVに出力する方針とします。
+
+    if isempty(relevant_t_points)
+        println("情報: 保存対象となる順位変化点 (results.change_points) がありません。")
+        # t_rangeの最初と最後の点のランキングだけでも出力するか、空のCSVにするか選択
+        # ここでは、もしall_pointsがあればそれを使う試み（なければ空のまま）
+        if hasfield(typeof(results), :all_points) && !isempty(results.all_points)
+            println("代わりに all_points の最初と最後のt値でのランキングを試みます。")
+            initial_t = results.all_points[1]
+            final_t = results.all_points[end]
+            relevant_t_points = unique(sort([initial_t, final_t]))
+            if !haskey(results.rankings, initial_t) || !haskey(results.rankings, final_t)
+                println("警告: all_pointsの最初または最後のt値に対応するランキングが見つかりません。")
+                return DataFrame()
+            end
+        else
+            println("警告: all_points も空か存在しません。空のCSVを作成します。")
+            # 空のDataFrameを作成してヘッダーだけ書き出すことも可能
+            # return DataFrame() # ここで終了しても良い
+        end
+    end
+
+    # ランキングデータから代替案の数を取得
+    # relevant_t_pointsが空でないことを確認してから
+    local n_alternatives
+    if !isempty(relevant_t_points) && haskey(results.rankings, relevant_t_points[1])
+        n_alternatives = length(results.rankings[relevant_t_points[1]])
+    else
+        # 最初のchange_pointに対するランキングがない場合、他のt_pointから試す
+        # または、all_pointsの最初のキーから取得する
+        if hasfield(typeof(results), :all_points) && !isempty(results.all_points) && haskey(results.rankings, results.all_points[1])
+            n_alternatives = length(results.rankings[results.all_points[1]])
+        else
+            println("警告: 代替案の数を決定できませんでした。CSV作成を中止します。")
+            return DataFrame()
+        end
+    end
+
+    if n_alternatives == 0
+        println("警告: 代替案の数が0です。")
+        return DataFrame()
+    end
+
+    # ヘッダーを作成
+    header_symbols = [:t_change_point]
+    for i in 1:n_alternatives
+        push!(header_symbols, Symbol("alt_$(i)_rank"))
+    end
+
+    # データ行を準備
+    data_rows = []
+    for t_val in relevant_t_points
+        if !haskey(results.rankings, t_val)
+            println("警告: t=$t_val に対応するランキングデータが見つかりません。この行はスキップします。")
+            continue
+        end
+        ranking_vector = results.rankings[t_val] # 例: [3, 1, 2, 5, 4] (1位が代替案3, 2位が代替案1, ...)
+
+        row_to_write = Any[t_val]
+
+        ranks_of_alternatives = zeros(Int, n_alternatives)
+        for rank_position in 1:n_alternatives
+            if rank_position <= length(ranking_vector)
+                alternative_id_at_this_rank = ranking_vector[rank_position]
+                if 1 <= alternative_id_at_this_rank <= n_alternatives
+                    ranks_of_alternatives[alternative_id_at_this_rank] = rank_position
+                else
+                    println("警告: t=$t_val で不正な代替案ID ($alternative_id_at_this_rank) がランキングに含まれています。")
+                end
+            else
+                println("警告: t=$t_val でランキングベクトルの長さが代替案数と一致しません。")
+                # この場合、ranks_of_alternatives の残りは0のまま
+            end
+        end
+
+        for alt_idx in 1:n_alternatives
+            push!(row_to_write, ranks_of_alternatives[alt_idx])
+        end
+        push!(data_rows, row_to_write)
+    end
+
+    # DataFrameを作成
+    df_output = DataFrame()
+    if !isempty(data_rows)
+        try
+            # 各列のデータ型を推測させるか、明示的に指定する
+            for (col_idx, col_name) in enumerate(header_symbols)
+                df_output[!, col_name] = [row[col_idx] for row in data_rows]
+            end
+        catch e
+            println("エラー: DataFrameの作成中にエラーが発生しました: $e")
+            println("data_rows: ", data_rows)
+            println("header_symbols: ", header_symbols)
+            return DataFrame() # エラー時は空のDataFrame
+        end
+    else
+        println("情報: DataFrame に追加するデータ行がありません。ヘッダーのみのDataFrameを作成します。")
+        for col_name in header_symbols # ヘッダーだけでも作成
+            df_output[!, col_name] = []
+        end
+    end
+
+    println("CSV保存関数: DataFrameが作成されました。行数: $(nrow(df_output)), 列数: $(ncol(df_output))")
+    if nrow(df_output) == 0 && isempty(relevant_t_points) # relevant_t_pointsが元々空で、dfも空なら
+        println("情報: 書き込むデータがないため、CSVファイルは作成されません。")
+        return df_output
+    end
+
+    abs_filename = abspath(filename) # 絶対パスを取得
+    println("CSVファイルを次の絶対パスに保存しようとしています: ", abs_filename)
+
+    try
+        println("CSV.write を使用して書き込みを試みます...")
+        CSV.write(abs_filename, df_output)
+        println("結果を $abs_filename に保存しました (CSV.write)。")
+
+        # ファイル内容の検証 (オプション)
+        if isfile(abs_filename)
+            file_content = readlines(abs_filename)
+            println("ファイル内容の最初の数行 (CSV.write):")
+            for (i, line) in enumerate(file_content)
+                if i > min(5, length(file_content))
+                    break
+                end
+                println(line)
+            end
+            if isempty(file_content) && nrow(df_output) > 0
+                println("警告: CSV.write で作成されたファイルが空ですが、DataFrameにはデータがありました。")
+            elseif isempty(file_content)
+                println("情報: CSV.write で作成されたファイルは空です（DataFrameも空またはヘッダーのみだった可能性があります）。")
+            end
+        else
+            println("警告: CSV.write でファイルが作成されませんでした。")
+        end
+
+    catch e_csv
+        println("エラー: CSV.write を使用したCSVファイル '$abs_filename' の書き込みに失敗しました: $e_csv")
+        println("DelimitedFiles を使用したフォールバックを試みます...")
+        try
+            header_str_array = [string(name) for name in names(df_output)]
+            # DataFrameを直接writedlmに渡すか、Matrix{String}に変換
+            # ここでは、DataFrameを直接渡してみる (DelimitedFilesが対応している場合)
+            # ただし、ヘッダー行とデータ行を分けて書き出す方が確実
+
+            open(abs_filename, "w") do io
+                println(io, join(header_str_array, ',')) # ヘッダー行
+                for r in 1:nrow(df_output)
+                    row_strings = [string(df_output[r, c]) for c in 1:ncol(df_output)]
+                    println(io, join(row_strings, ','))
+                end
+            end
+            println("結果を $abs_filename に保存しました (DelimitedFiles)。")
+
+            if isfile(abs_filename)
+                file_content_dlm = readlines(abs_filename)
+                println("ファイル内容の最初の数行 (DelimitedFiles):")
+                for (i, line) in enumerate(file_content_dlm)
+                    if i > min(5, length(file_content_dlm))
+                        break
+                    end
+                    println(line)
+                end
+                if isempty(file_content_dlm) && nrow(df_output) > 0
+                    println("警告: DelimitedFiles で作成されたファイルが空ですが、DataFrameにはデータがありました。")
+                elseif isempty(file_content_dlm)
+                    println("情報: DelimitedFiles で作成されたファイルは空です。")
+                end
+            else
+                println("警告: DelimitedFiles でファイルが作成されませんでした。")
+            end
+        catch e_dlm
+            println("エラー: DelimitedFiles を使用したCSVファイル '$abs_filename' の書き込みにも失敗しました: $e_dlm")
+        end
+    end
+
+    return df_output
 end
 
 end # module
