@@ -15,7 +15,6 @@ function regret_value(o_o::Int, o_q::Int, t::Float64, matrix, methodW)
     # 一時的に regret を計算
     temp_matrix = deepcopy(matrix)
     _, _ = calc_regret(temp_matrix, Y_L, Y_R)
-    println(o_o, o_q, temp_matrix[o_o, o_q].regret)
     # 行列内のリグレット値を取得
     return temp_matrix[o_o, o_q].regret
 end

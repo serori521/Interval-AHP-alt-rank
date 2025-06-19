@@ -13,7 +13,7 @@ function find_optimal_trange(L::Array{Float64,1}, R::Array{Float64,1})
     end
     t_R = 1 / max_sum
     t_L = 1 / min_sum
-    return t_L, t_R
+    return min(t_L, t_R), max(t_L, t_R)
 end
 
 # タプルの要素として使用するデータ構造を定義する
