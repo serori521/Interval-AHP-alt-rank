@@ -15,7 +15,7 @@
 #define M 100							// 効用行列の個数
 #define bM 1
 #define Rt 5							// 真の重要度を与える回数 A~E
-#define Method_N 16						// 推定法手法の個数
+#define Method_N 2						// 推定法手法の個数
 
 
 
@@ -57,8 +57,9 @@ int main(void) {
 			char which_utility[2][31] = { "\\u1","\\u2" };
 			int f;
 			int md, rt;
-			char method_name_list[16][64] = { "\\E-AMRw", "\\E-MMRw", "\\G-AMRw", "\\G-MMRw", "\\eAMRw", "\\eAMRwc", "\\eMMRw", "\\eMMRwc", "\\gAMRw", "\\gAMRwc", "\\gMMRw", "\\gMMRwc", "\\lAMRw", "\\lAMRwc", "\\lMMRw", "\\lMMRwc" };
-
+			//char method_name_list[16][64] = { "\\E-AMRw", "\\E-MMRw", "\\G-AMRw", "\\G-MMRw", "\\eAMRw", "\\eAMRwc", "\\eMMRw", "\\eMMRwc", "\\gAMRw", "\\gAMRwc", "\\gMMRw", "\\gMMRwc", "\\lAMRw", "\\lAMRwc", "\\lMMRw", "\\lMMRwc" };
+			char method_name_list[2][64] = { "\\AMRwc","\\MMRwc" };
+			char file_method[2][64] = { "AMRwc","MMRwc" };
 			double trueW[2 * N], true_wR[N], true_wL[N];
 
 			double ukari[Alt * M][8];

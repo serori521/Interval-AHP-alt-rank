@@ -21,7 +21,7 @@
 #define M 100							// 効用行列の個数
 #define bM 1
 #define Rt 5							// 真の重要度を与える回数 A~E
-#define Method_N 16						// 推定法手法の個数
+#define Method_N 2						// 推定法手法の個数
 
 
 const double PI = 3.14159265358979;
@@ -51,10 +51,12 @@ int main(void) {
 
 				char which_utility[2][31] = { "\\u1","\\u2" };
 				char true_weight_list[Rt][8] = { "A","B","C","D","E" };		//A-E
-				char method_name_list[16][64] = { "\\E-AMRw", "\\E-MMRw", "\\G-AMRw", "\\G-MMRw", "\\eAMRw", "\\eAMRwc", "\\eMMRw", "\\eMMRwc", "\\gAMRw", "\\gAMRwc", "\\gMMRw", "\\gMMRwc", "\\lAMRw", "\\lAMRwc", "\\lMMRw", "\\lMMRwc" };
-				char file_method[16][64] = { "E-AMRw", "E-MMRw", "G-AMRw", "G-MMRw", "eAMRw", "eAMRwc", "eMMRw", "eMMRwc", "gAMRw", "gAMRwc", "gMMRw", "gMMRwc", "lAMRw", "lAMRwc", "lMMRw", "lMMRwc" };
+				//char method_name_list[16][64] = { "\\E-AMRw", "\\E-MMRw", "\\G-AMRw", "\\G-MMRw", "\\eAMRw", "\\eAMRwc", "\\eMMRw", "\\eMMRwc", "\\gAMRw", "\\gAMRwc", "\\gMMRw", "\\gMMRwc", "\\lAMRw", "\\lAMRwc", "\\lMMRw", "\\lMMRwc" };
+				//char file_method[16][64] = { "E-AMRw", "E-MMRw", "G-AMRw", "G-MMRw", "eAMRw", "eAMRwc", "eMMRw", "eMMRwc", "gAMRw", "gAMRwc", "gMMRw", "gMMRwc", "lAMRw", "lAMRwc", "lMMRw", "lMMRwc" };
 				//int method_id_list[Method_N] = {0};		// 使用する推定法のIDリスト
 				//int method_id_list[Method_N] = { 0,1,2,3,4,5,6,7,8,9,10,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 };
+				char method_name_list[2][64] = { "\\AMRwc","\\MMRwc" };
+				char file_method[2][64] = { "AMRwc","MMRwc" };
 				int evaluation_num = N - 4;				//下のunameLIstの配列に入れるための数字
 				char given_weight[5][31] = { "\\N=4" ,"\\N=5" ,"\\N=6" ,"\\N=7+" ,"\\N=8+" };//評価基準の数はいくつかを決定する配列
 				int i, j, k, l;
@@ -190,11 +192,11 @@ int main(void) {
 					}
 
 				}
-				sprintf(filepath_o, "..\\data\\%s_results%s%s再現数平均%d_u%d_%s.csv", max_or_min[Morm], which_utility[utility_num], given_weight[evaluation_num], R, utility, max_or_min[Morm]);
+				sprintf(filepath_o, "..\\data\\%s_results%s%s再現数平均wc%d_u%d_%s.csv", max_or_min[Morm], which_utility[utility_num], given_weight[evaluation_num], R, utility, max_or_min[Morm]);
 				fp_sum_recall = fopen(filepath_o, "w");
 				fprintf(fp_sum_recall, "%s\n,A,B,C,D,E\n", filepath_o);
 
-				sprintf(filepath_o, "..\\data\\%s_results%s%s最良正解数平均%d_u%d_%s.csv", max_or_min[Morm], which_utility[utility_num], given_weight[evaluation_num], R, utility, max_or_min[Morm]);
+				sprintf(filepath_o, "..\\data\\%s_results%s%s最良正解数平均wc%d_u%d_%s.csv", max_or_min[Morm], which_utility[utility_num], given_weight[evaluation_num], R, utility, max_or_min[Morm]);
 				fp_sum_precision = fopen(filepath_o, "w");
 				fprintf(fp_sum_precision, "%s\n,A,B,C,D,E\n", filepath_o);
 
